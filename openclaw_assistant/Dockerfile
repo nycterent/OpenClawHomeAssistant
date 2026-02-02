@@ -43,9 +43,10 @@ RUN npm config set fund false && npm config set audit false \
  && npm install -g openclaw@2026.1.30
 
 COPY run.sh /run.sh
+COPY oc_config_helper.py /oc_config_helper.py
 COPY nginx.conf.tpl /etc/nginx/nginx.conf.tpl
 COPY landing.html.tpl /etc/nginx/landing.html.tpl
-RUN chmod +x /run.sh \
+RUN chmod +x /run.sh /oc_config_helper.py \
  && mkdir -p /run/nginx
 
 CMD [ "/run.sh" ]
