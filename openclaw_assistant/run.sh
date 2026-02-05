@@ -252,13 +252,27 @@ openclaw gateway run &
 GW_PID=$!
 
 # Start web terminal (optional)
-# Kill any stray ttyd processes from previous runs to avoid port conflicts
-pkill -f "ttyd.*-p.*-b /terminal" || true
+TTYD_PID_FILE="/var/run/openclaw-ttyd.pid"
+
+# Clean up stale ttyd process from previous run using PID file
+if [ -f "$TTYD_PID_FILE" ]; then
+  OLD_PID=$(cat "$TTYD_PID_FILE" 2>/dev/null || echo "")
+  if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+    echo "Stopping previous ttyd process (PID $OLD_PID)..."
+    kill "$OLD_PID" 2>/dev/null || true
+    sleep 1
+    # Force kill if still running
+    kill -9 "$OLD_PID" 2>/dev/null || true
+  fi
+  rm -f "$TTYD_PID_FILE"
+fi
 
 if [ "$ENABLE_TERMINAL" = "true" ] || [ "$ENABLE_TERMINAL" = "1" ]; then
   echo "Starting web terminal (ttyd) on 127.0.0.1:${TERMINAL_PORT} ..."
   ttyd -W -i 127.0.0.1 -p "${TERMINAL_PORT}" -b /terminal bash &
   TTYD_PID=$!
+  echo "$TTYD_PID" > "$TTYD_PID_FILE"
+  echo "ttyd started with PID $TTYD_PID"
 else
   echo "Terminal disabled (enable_terminal=$ENABLE_TERMINAL)"
 fi
