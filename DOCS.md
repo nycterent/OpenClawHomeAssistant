@@ -170,7 +170,13 @@ Control how the OpenClaw gateway binds to the network:
 These settings are applied automatically on add-on startup. No need to run `openclaw config` commands manually.
 
 ### Terminal
-- `enable_terminal` (bool, default **true**)
+- **`enable_terminal`** (bool, default **true**)
+  - Enable or disable the web terminal button inside Home Assistant
+  
+- **`terminal_port`** (int, default **7681**)
+  - Port number for the web terminal (ttyd) to listen on
+  - Change this if port 7681 conflicts with another service on your system
+  - Valid range: 1024-65535
 
 Security note: the terminal gives shell access inside the add-on container.
 
