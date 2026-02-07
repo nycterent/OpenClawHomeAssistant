@@ -29,7 +29,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rsync \
     bat \
     less \
-    openjdk-17-jre-headless \
     zip \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
@@ -48,13 +47,35 @@ RUN ARCH=$(echo ${TARGETARCH:-$(dpkg --print-architecture)} | sed 's|arm64|aarch
  && curl -fsSL "https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd.${ARCH}" -o /usr/local/bin/ttyd \
  && chmod +x /usr/local/bin/ttyd
 
+# Install Adoptium Temurin JRE 21 (signal-cli 0.13.x requires Java 21)
+# Not in Debian Bookworm repos; download tarball directly from Adoptium API.
+# Available for amd64 and aarch64. armv7 is skipped (no Java 21 builds exist).
+RUN MACHINE_ARCH=$(dpkg --print-architecture) \
+ && case "$MACHINE_ARCH" in \
+      amd64)  JRE_ARCH="x64" ;; \
+      arm64)  JRE_ARCH="aarch64" ;; \
+      *)      echo "INFO: Java 21 not available for $MACHINE_ARCH, skipping"; exit 0 ;; \
+    esac \
+ && curl -fsSL -L "https://api.adoptium.net/v3/binary/latest/21/ga/linux/${JRE_ARCH}/jre/hotspot/normal/eclipse?project=jdk" \
+      -o /tmp/temurin-jre.tar.gz \
+ && mkdir -p /opt/java \
+ && tar xf /tmp/temurin-jre.tar.gz -C /opt/java --strip-components=1 \
+ && rm /tmp/temurin-jre.tar.gz \
+ && /opt/java/bin/java -version
+
+ENV JAVA_HOME=/opt/java
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
+
 # Install signal-cli (required for OpenClaw Signal channel plugin)
 # Official tar.gz bundles libsignal_jni for amd64 only.
 # For aarch64/armv7 we download the native library from exquo/signal-libs-build
 # and inject it into the libsignal-client jar.
 ARG SIGNAL_CLI_VERSION=0.13.24
 ARG LIBSIGNAL_VERSION=0.87.1
-RUN curl -fsSL "https://github.com/AsamK/signal-cli/releases/download/v${SIGNAL_CLI_VERSION}/signal-cli-${SIGNAL_CLI_VERSION}.tar.gz" \
+RUN if ! command -v java >/dev/null 2>&1; then \
+      echo "INFO: Java not available, skipping signal-cli install"; exit 0; \
+    fi \
+ && curl -fsSL "https://github.com/AsamK/signal-cli/releases/download/v${SIGNAL_CLI_VERSION}/signal-cli-${SIGNAL_CLI_VERSION}.tar.gz" \
       -o /tmp/signal-cli.tar.gz \
  && tar xf /tmp/signal-cli.tar.gz -C /opt \
  && ln -s /opt/signal-cli-${SIGNAL_CLI_VERSION}/bin/signal-cli /usr/local/bin/signal-cli \
