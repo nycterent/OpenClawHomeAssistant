@@ -24,6 +24,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     sudo \
     vim \
     nano \
+    openjdk-17-jre-headless \
+    zip \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 
@@ -40,6 +42,37 @@ RUN ARCH=$(echo ${TARGETARCH:-$(dpkg --print-architecture)} | sed 's|arm64|aarch
  && echo "Downloading ttyd for arch: ${ARCH}" \
  && curl -fsSL "https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd.${ARCH}" -o /usr/local/bin/ttyd \
  && chmod +x /usr/local/bin/ttyd
+
+# Install signal-cli (required for OpenClaw Signal channel plugin)
+# Official tar.gz bundles libsignal_jni for amd64 only.
+# For aarch64/armv7 we download the native library from exquo/signal-libs-build
+# and inject it into the libsignal-client jar.
+ARG SIGNAL_CLI_VERSION=0.13.24
+ARG LIBSIGNAL_VERSION=0.87.1
+RUN curl -fsSL "https://github.com/AsamK/signal-cli/releases/download/v${SIGNAL_CLI_VERSION}/signal-cli-${SIGNAL_CLI_VERSION}.tar.gz" \
+      -o /tmp/signal-cli.tar.gz \
+ && tar xf /tmp/signal-cli.tar.gz -C /opt \
+ && ln -s /opt/signal-cli-${SIGNAL_CLI_VERSION}/bin/signal-cli /usr/local/bin/signal-cli \
+ && rm /tmp/signal-cli.tar.gz \
+ && MACHINE_ARCH=$(dpkg --print-architecture) \
+ && if [ "$MACHINE_ARCH" != "amd64" ]; then \
+      case "$MACHINE_ARCH" in \
+        arm64)  LIB_ARCH="aarch64-unknown-linux-gnu" ;; \
+        armhf)  LIB_ARCH="armv7-unknown-linux-gnueabihf" ;; \
+        *)      echo "WARNING: Unsupported arch $MACHINE_ARCH for libsignal_jni"; exit 0 ;; \
+      esac \
+      && curl -fsSL "https://github.com/exquo/signal-libs-build/releases/download/libsignal_v${LIBSIGNAL_VERSION}/libsignal_jni.so-v${LIBSIGNAL_VERSION}-${LIB_ARCH}.tar.gz" \
+           -o /tmp/libsignal_jni.tar.gz \
+      && tar xf /tmp/libsignal_jni.tar.gz -C /tmp \
+      && cd /opt/signal-cli-${SIGNAL_CLI_VERSION}/lib \
+      && zip -d libsignal-client-*.jar libsignal_jni_amd64.so 2>/dev/null || true \
+      && cp /tmp/libsignal_jni.so . \
+      && zip libsignal-client-*.jar libsignal_jni.so \
+      && rm libsignal_jni.so \
+      && rm -f /tmp/libsignal_jni.tar.gz /tmp/libsignal_jni.so \
+      && cd / \
+    ; fi \
+ && signal-cli --version
 
 RUN node -v && npm -v
 
@@ -98,6 +131,18 @@ USER root
 # Install OpenClaw globally
 RUN npm config set fund false && npm config set audit false \
  && npm install -g openclaw@2026.2.6-3
+
+# Install Matrix plugin dependencies
+# OpenClaw bundles extension source but npm -g doesn't install their deps.
+# The devDependency "openclaw": "workspace:*" must be removed first (monorepo artifact).
+RUN MATRIX_EXT_DIR="/usr/lib/node_modules/openclaw/extensions/matrix" \
+ && if [ -d "$MATRIX_EXT_DIR" ] && [ -f "$MATRIX_EXT_DIR/package.json" ]; then \
+      cd "$MATRIX_EXT_DIR" \
+      && node -e "const p=require('./package.json'); delete (p.devDependencies||{}).openclaw; require('fs').writeFileSync('./package.json', JSON.stringify(p,null,2)+'\n')" \
+      && npm install --omit=dev --no-fund --no-audit \
+    ; else \
+      echo "WARNING: Matrix extension directory not found, skipping" \
+    ; fi
 
 COPY run.sh /run.sh
 COPY oc_config_helper.py /oc_config_helper.py
