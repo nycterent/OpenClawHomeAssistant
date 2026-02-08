@@ -33,6 +33,7 @@ run.sh (PID 1)
 ```
 
 - **Three background services** managed by run.sh with PID tracking and SIGTERM propagation.
+- **Custom scripts**: `/config/.openclaw/scripts.d/*.sh` executed on startup (alphabetical order) and shutdown (reverse order). Scripts receive `start` or `stop` as $1. See `scripts.d.examples/` for examples.
 - **Container exits** when the gateway process exits (`wait $GW_PID`).
 - **Persistent storage** at `/config` (mapped to HA addon_config). Config lives at `/config/.openclaw/openclaw.json`, workspace at `/config/clawd`.
 - **Config ownership**: The add-on only bootstraps a minimal config on first boot (gateway mode + auth token). All other config is owned by OpenClaw's onboarding tools. `oc_config_helper.py` surgically updates only gateway bind/port/mode/allowInsecureAuth without touching other keys.

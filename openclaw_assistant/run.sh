@@ -66,6 +66,12 @@ export XDG_CONFIG_HOME=/config
 
 mkdir -p /config/.openclaw /config/clawd /config/keys /config/secrets
 
+# ------------------------------------------------------------------------------
+# Custom startup/shutdown scripts directory
+# ------------------------------------------------------------------------------
+SCRIPTS_DIR="/config/.openclaw/scripts.d"
+mkdir -p "$SCRIPTS_DIR"
+
 # Back-compat: some docs/scripts assume /data; point it at /config.
 if [ ! -e /data ]; then
   ln -s /config /data || true
@@ -157,6 +163,9 @@ TTYD_PID=""
 shutdown() {
   echo "Shutdown requested; stopping services..."
 
+  # Run custom shutdown scripts (reverse order)
+  run_shutdown_scripts "$SCRIPTS_DIR"
+
   if [ -n "${NGINX_PID}" ] && kill -0 "${NGINX_PID}" >/dev/null 2>&1; then
     kill -TERM "${NGINX_PID}" >/dev/null 2>&1 || true
     wait "${NGINX_PID}" || true
@@ -178,6 +187,57 @@ shutdown() {
 }
 
 trap shutdown INT TERM
+
+# ------------------------------------------------------------------------------
+# Run custom startup/shutdown scripts from scripts.d
+# ------------------------------------------------------------------------------
+run_startup_scripts() {
+  local scripts_dir="$1"
+  if [ ! -d "$scripts_dir" ]; then
+    return 0
+  fi
+
+  shopt -s nullglob
+  local scripts=("$scripts_dir"/*.sh)
+  shopt -u nullglob
+
+  if [ ${#scripts[@]} -eq 0 ]; then
+    echo "INFO: No startup scripts in $scripts_dir"
+    return 0
+  fi
+
+  echo "INFO: Running ${#scripts[@]} startup script(s) from $scripts_dir"
+  for script in "${scripts[@]}"; do
+    if [ -x "$script" ]; then
+      echo "INFO: Executing $script..."
+      if ! "$script" start; then
+        echo "WARN: $script failed (exit code $?), continuing..."
+      fi
+    else
+      echo "WARN: $script is not executable, skipping"
+    fi
+  done
+}
+
+run_shutdown_scripts() {
+  local scripts_dir="$1"
+  if [ ! -d "$scripts_dir" ]; then
+    return 0
+  fi
+
+  shopt -s nullglob
+  local scripts=("$scripts_dir"/*.sh)
+  shopt -u nullglob
+
+  # Run in reverse order for shutdown
+  for (( i=${#scripts[@]}-1; i>=0; i-- )); do
+    local script="${scripts[$i]}"
+    if [ -x "$script" ]; then
+      echo "INFO: Stopping $script..."
+      "$script" stop 2>/dev/null || true
+    fi
+  done
+}
 
 if ! command -v openclaw >/dev/null 2>&1; then
   echo "ERROR: openclaw is not installed."
@@ -247,6 +307,9 @@ else
   echo "WARN: OpenClaw config not found at $OPENCLAW_CONFIG_PATH, cannot apply gateway settings"
   echo "INFO: Run 'openclaw onboard' first, then restart the add-on"
 fi
+
+# Run custom startup scripts (before gateway so services are ready)
+run_startup_scripts "$SCRIPTS_DIR"
 
 echo "Starting OpenClaw Assistant gateway (openclaw)..."
 openclaw gateway run &

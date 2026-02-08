@@ -241,3 +241,65 @@ The add-on will still start and work - Homebrew is optional.
 ### Terminal isn’t visible
 - Ensure `enable_terminal=true`
 - Check logs for `Starting web terminal (ttyd)`
+
+---
+
+## 6) Custom Startup Scripts
+
+The add-on supports custom startup/shutdown scripts via `/config/.openclaw/scripts.d/`.
+
+This allows you to run custom daemons or services (like signal-cli for Signal messaging) without modifying the add-on code.
+
+### How it works
+
+1. Create executable scripts in `/config/.openclaw/scripts.d/`
+2. Scripts must accept `start` or `stop` as the first argument
+3. Scripts run in **alphabetical order** on startup, **reverse order** on shutdown
+4. Use numeric prefixes for ordering: `10-signal-cli.sh`, `20-other.sh`
+5. Scripts run **before** the OpenClaw gateway starts (so services are ready)
+
+### Creating a script
+
+```bash
+# Inside the add-on terminal:
+mkdir -p /config/.openclaw/scripts.d
+nano /config/.openclaw/scripts.d/10-myservice.sh
+chmod +x /config/.openclaw/scripts.d/10-myservice.sh
+```
+
+Script template:
+```bash
+#!/bin/bash
+case "${1:-start}" in
+  start)
+    echo "Starting my service..."
+    # Start your daemon here
+    ;;
+  stop)
+    echo "Stopping my service..."
+    # Stop your daemon here
+    ;;
+esac
+```
+
+### Example: Signal-CLI daemon
+
+For Signal messaging support, copy the example script from the add-on source:
+- Source: `scripts.d.examples/10-signal-cli.sh`
+- Destination: `/config/.openclaw/scripts.d/10-signal-cli.sh`
+
+The script handles:
+- Persistent storage for signal-cli credentials (survives container recreation)
+- Automatic daemon startup when Signal channel is configured
+- Graceful shutdown on container stop
+
+**Prerequisites for Signal:**
+1. Install signal-cli (OpenClaw does this during Signal channel setup)
+2. Register your phone number:
+   ```bash
+   /config/.openclaw/tools/signal-cli/*/signal-cli -a +YOURPHONE register
+   # Complete captcha at https://signalcaptchas.org/registration/generate.html
+   /config/.openclaw/tools/signal-cli/*/signal-cli -a +YOURPHONE verify CODE
+   ```
+3. Configure Signal channel in OpenClaw (`openclaw configure`)
+4. Copy the startup script and restart the add-on
