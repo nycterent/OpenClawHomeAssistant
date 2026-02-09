@@ -59,13 +59,24 @@ set +x
 # HA add-ons mount persistent storage at /config (maps to /addon_configs/<slug> on the host).
 export HOME=/config
 
-# Explicitly set OpenClaw directories to ensure they persist across add-on updates
-# This prevents loss of installed skills, configuration, and workspace state
-export OPENCLAW_CONFIG_DIR=/config/.openclaw
-export OPENCLAW_WORKSPACE_DIR=/config/clawd
-export XDG_CONFIG_HOME=/config
+# OPENCLAW_STATE_DIR is the authoritative env var OpenClaw reads for ALL persistent state
+# (config, agents, sessions, memory, credentials, skills, tools).
+# Without this, OpenClaw falls back to ~/.openclaw which works via HOME but is fragile.
+export OPENCLAW_STATE_DIR=/config/.openclaw
+export OPENCLAW_CONFIG_PATH=/config/.openclaw/openclaw.json
 
-mkdir -p /config/.openclaw /config/clawd /config/keys /config/secrets
+# XDG dirs — ensures tools invoked by OpenClaw also write to persistent storage
+export XDG_CONFIG_HOME=/config/.config
+export XDG_DATA_HOME=/config/.local/share
+export XDG_CACHE_HOME=/config/.cache
+
+# npm/pnpm cache — survives container rebuilds, speeds up skill reinstalls
+export npm_config_cache=/config/.npm
+export PNPM_HOME=/config/.local/share/pnpm
+
+mkdir -p /config/.openclaw /config/clawd /config/keys /config/secrets \
+         /config/.config /config/.local/share /config/.cache /config/.npm \
+         /config/.local/share/pnpm
 
 # ------------------------------------------------------------------------------
 # Custom startup/shutdown scripts directory
