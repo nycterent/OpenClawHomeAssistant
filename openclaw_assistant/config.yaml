@@ -1,5 +1,5 @@
 name: OpenClaw Assistant
-version: "0.5.36"
+version: "0.5.37"
 slug: openclaw_assistant
 description: Run OpenClaw Assistant (OpenClaw-compatible) as a Home Assistant add-on.
 url: https://github.com/techartdev/OpenClawHomeAssistant
@@ -65,6 +65,11 @@ options:
   # Gateway port to listen on
   gateway_port: 18789
 
+  # Enable OpenAI-compatible Chat Completions API endpoint
+  # When enabled, OpenClaw can be used as a conversation agent in HA Assist pipeline
+  # via Extended OpenAI Conversation (HACS) or any OpenAI-compatible client
+  enable_openai_api: false
+
   # Allow insecure HTTP authentication (required for HTTP gateway access on LAN)
   # WARNING: Only enable if you're using HTTP (not HTTPS) for gateway_public_url
   # Default is false for security.
@@ -87,5 +92,6 @@ schema:
   gateway_mode: list(local|remote)?
   gateway_bind_mode: list(loopback|lan)?
   gateway_port: int(1,65535)?
+  enable_openai_api: bool?
   allow_insecure_auth: bool?
 
