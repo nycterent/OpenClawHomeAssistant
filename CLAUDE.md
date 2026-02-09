@@ -44,12 +44,20 @@ run.sh (PID 1)
 
 ## Build & Deployment
 
-This is a **Home Assistant add-on** — there is no local build/test/lint workflow. The build system is HA's Docker-based add-on builder.
+This is a **Home Assistant add-on** — the build system is HA's Docker-based add-on builder.
 
 - **Base images** defined in `build.yaml`: Debian Bookworm for amd64, aarch64, armv7.
 - **Dockerfile** is the single build artifact. To test changes, build with the HA add-on builder or `docker build`.
-- **No CI/CD, no tests, no linter config** exists in this repo.
 - Debian chosen over Alpine for glibc compatibility (native modules like clipboard, node-llama-cpp).
+
+### Tests
+
+Pure-Python test suite using pytest. Tests cover `oc_config_helper.py` logic, config.yaml/schema/translation consistency, template placeholder coverage, and run.sh env var exports. All tests run locally on macOS — no Docker required.
+
+```bash
+pip install pytest pyyaml   # one-time setup
+pytest tests/ -v            # run all 44 tests
+```
 
 ## Versioning
 
