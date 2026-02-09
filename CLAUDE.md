@@ -8,6 +8,8 @@ Home Assistant add-on that runs **OpenClaw** (an AI assistant gateway) inside Ho
 
 Current version: **0.5.39** with OpenClaw **2026.2.6-3**.
 
+This is a **fork** of [techartdev/OpenClawHomeAssistant](https://github.com/techartdev/OpenClawHomeAssistant). The fork adds custom features (scripts.d hooks, Java 21 fix, Signal/Matrix deps). When syncing with upstream, merge or rebase against `techartdev/main` — the fork may be several versions ahead with local customizations.
+
 ## Repository Structure
 
 All add-on code lives in `openclaw_assistant/`. The root contains only repo-level files (README.md, DOCS.md, repository.yaml).
@@ -55,6 +57,19 @@ Two versions to track when updating:
 1. **Add-on version** in `config.yaml` (`version: "0.5.39"`) — bump for any add-on change.
 2. **OpenClaw version** in `Dockerfile` (`npm install -g openclaw@2026.2.6-3`) — update when upgrading upstream OpenClaw.
 
+## Pinned Dependency Versions (Dockerfile)
+
+| Dependency | Version | Location / Notes |
+|---|---|---|
+| Node.js | 22 LTS | NodeSource `setup_22.x` |
+| OpenClaw | 2026.2.6-3 | `npm install -g openclaw@VERSION` |
+| ttyd | 1.7.7 | Binary download from GitHub releases |
+| Java (Temurin JRE) | 21 | Adoptium API; amd64/aarch64 only |
+| signal-cli | 0.13.24 | `ARG SIGNAL_CLI_VERSION` |
+| libsignal | 0.87.1 | `ARG LIBSIGNAL_VERSION` (non-amd64 patching) |
+
+When bumping any of these, update the corresponding `ARG` or URL in the Dockerfile.
+
 ## Key Design Decisions
 
 - **Gateway Web UI is NOT embedded in Ingress** — WebSockets are unreliable through HA's Ingress proxy. The landing page opens it in a new tab instead.
@@ -67,6 +82,21 @@ Two versions to track when updating:
 - **Java 21 (Temurin JRE)** — Required by signal-cli 0.13.x. Available for amd64 and aarch64 only; armv7 skipped (no builds exist).
 - **signal-cli native library patching** — For non-amd64 arches, the Dockerfile downloads a compatible `libsignal_jni.so` from exquo/signal-libs-build and injects it into the libsignal-client jar.
 - **Matrix plugin** — Extension deps installed post-`npm install -g` because global installs skip extension `node_modules`. The monorepo `workspace:*` devDependency must be stripped first.
+
+## oc_config_helper.py CLI
+
+Called by run.sh to safely modify `openclaw.json` without clobbering user settings:
+
+```bash
+# Apply all gateway settings at once (called during startup)
+python3 /oc_config_helper.py apply-gateway-settings <local|remote> <loopback|lan> <port> <true|false>
+
+# Get/set individual gateway keys
+python3 /oc_config_helper.py get <key>
+python3 /oc_config_helper.py set <key> <value>
+```
+
+Config path is read from `$OPENCLAW_CONFIG_PATH` (default: `/config/.openclaw/openclaw.json`).
 
 ## Configuration Flow
 
@@ -95,3 +125,13 @@ To add a new placeholder: define it in the template file, then add the replaceme
 - **Dockerfile**: OpenClaw version is pinned (`npm install -g openclaw@VERSION`). ttyd architecture detection maps Docker TARGETARCH to ttyd release filenames. signal-cli and Java installs are arch-conditional (armv7 gets no Java).
 - **Templates**: `__PLACEHOLDER__` strings are replaced by Python at runtime in run.sh. Add new placeholders there.
 - **Translations**: Every option in config.yaml should have entries in all translation files under `translations/`.
+
+## Upstream Sync
+
+```bash
+git remote add upstream https://github.com/techartdev/OpenClawHomeAssistant.git  # if not set
+git fetch upstream
+git merge upstream/main  # or rebase
+```
+
+After merging, check for OpenClaw version bumps in the Dockerfile and config.yaml version conflicts. The fork's version should always be >= upstream.
