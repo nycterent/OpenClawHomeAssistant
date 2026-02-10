@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Home Assistant add-on that runs **OpenClaw** (an AI assistant gateway) inside Home Assistant OS. Provides an always-on gateway, an embedded web terminal (ttyd), and an Ingress landing page with links to the Gateway Web UI.
 
-Current version: **0.5.41** with OpenClaw **2026.2.6-3**.
+Current version: **0.5.41** with OpenClaw **2026.2.9**.
 
 This is a **fork** of [techartdev/OpenClawHomeAssistant](https://github.com/techartdev/OpenClawHomeAssistant). The fork adds custom features (scripts.d hooks, Java 21 fix, Signal/Matrix deps). When syncing with upstream, merge or rebase against `techartdev/main` — the fork may be several versions ahead with local customizations.
 
@@ -73,7 +73,7 @@ Two versions to track when updating:
 | Dependency | Version | Location / Notes |
 |---|---|---|
 | Node.js | 22 LTS | NodeSource `setup_22.x` |
-| OpenClaw | 2026.2.6-3 | `npm install -g openclaw@VERSION` |
+| OpenClaw | 2026.2.9 | `npm install -g openclaw@VERSION` |
 | ttyd | 1.7.7 | Binary download from GitHub releases |
 | Java (Temurin JRE) | 21 | Adoptium API; amd64/aarch64 only |
 | signal-cli | 0.13.24 | `ARG SIGNAL_CLI_VERSION` |
