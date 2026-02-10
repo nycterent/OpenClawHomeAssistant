@@ -51,6 +51,15 @@ GATEWAY_PORT=$(jq -r '.gateway_port // 18789' "$OPTIONS_FILE")
 ENABLE_OPENAI_API=$(jq -r '.enable_openai_api // false' "$OPTIONS_FILE")
 ALLOW_INSECURE_AUTH=$(jq -r '.allow_insecure_auth // false' "$OPTIONS_FILE")
 
+# Memory configuration
+ENABLE_MEMORY=$(jq -r '.enable_memory // true' "$OPTIONS_FILE")
+MEMORY_SESSION_INDEXING=$(jq -r '.memory_session_indexing // true' "$OPTIONS_FILE")
+MEM0_API_KEY=$(jq -r '.mem0_api_key // empty' "$OPTIONS_FILE")
+MEM0_BASE_URL=$(jq -r '.mem0_base_url // empty' "$OPTIONS_FILE")
+MEM0_USER_ID=$(jq -r '.mem0_user_id // "ha-user"' "$OPTIONS_FILE")
+COGNEE_API_KEY=$(jq -r '.cognee_api_key // empty' "$OPTIONS_FILE")
+COGNEE_BASE_URL=$(jq -r '.cognee_base_url // empty' "$OPTIONS_FILE")
+
 export TZ="$TZNAME"
 
 # Reduce risk of secrets ending up in logs
@@ -318,6 +327,22 @@ if [ -f "$OPENCLAW_CONFIG_PATH" ]; then
 else
   echo "WARN: OpenClaw config not found at $OPENCLAW_CONFIG_PATH, cannot apply gateway settings"
   echo "INFO: Run 'openclaw onboard' first, then restart the add-on"
+fi
+
+# Apply memory settings (non-fatal — memory failure shouldn't block gateway)
+if [ -f "$HELPER_PATH" ]; then
+  python3 "$HELPER_PATH" apply-memory-settings "$ENABLE_MEMORY" "$MEMORY_SESSION_INDEXING" \
+    "${MEM0_API_KEY:-__EMPTY__}" "${MEM0_BASE_URL:-__EMPTY__}" "${MEM0_USER_ID:-__EMPTY__}" \
+    "${COGNEE_API_KEY:-__EMPTY__}" "${COGNEE_BASE_URL:-__EMPTY__}" || \
+    echo "WARN: Failed to apply memory settings; continuing with existing config"
+fi
+
+# Install memory plugins if configured (idempotent, cached in /config)
+if [ -n "$MEM0_API_KEY" ]; then
+  openclaw plugins install @mem0/openclaw-mem0 2>&1 || echo "WARN: Mem0 plugin install failed"
+fi
+if [ -n "$COGNEE_API_KEY" ]; then
+  openclaw plugins install @cognee/cognee-openclaw 2>&1 || echo "WARN: Cognee plugin install failed"
 fi
 
 # Run custom startup scripts (before gateway so services are ready)

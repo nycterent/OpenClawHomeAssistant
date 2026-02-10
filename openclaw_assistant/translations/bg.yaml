@@ -58,3 +58,31 @@ configuration:
   allow_insecure_auth:
     name: Разрешаване на HTTP автентикация
     description: Разрешаване на HTTP автентикация за достъп до gateway в локалната мрежа. ВНИМАНИЕ - Активирайте само ако използвате HTTP (не HTTPS) за gateway_public_url. Необходимо за достъп от браузър през HTTP.
+
+  enable_memory:
+    name: Активиране на памет
+    description: Активиране на вградено SQLite хибридно търсене в паметта (BM25 + вектор). Осигурява автоматично припомняне на памет между сесиите.
+
+  memory_session_indexing:
+    name: Индексиране на сесии
+    description: Индексиране на минали сесии като търсима памет. Когато е деактивирано, се търси само в явните записи в паметта.
+
+  mem0_api_key:
+    name: Mem0 API ключ
+    description: API ключ за Mem0 плъгин за памет. Оставете празно за деактивиране. Вземете ключ от https://app.mem0.ai
+
+  mem0_base_url:
+    name: Mem0 базов URL
+    description: Заменящ базов URL за самостоятелно хостван Mem0. Оставете празно за Mem0 облак (https://api.mem0.ai).
+
+  mem0_user_id:
+    name: Mem0 потребителски ID
+    description: Потребителско пространство от имена за съхранение на памет в Mem0 (по подразбиране - ha-user)
+
+  cognee_api_key:
+    name: Cognee API ключ
+    description: API ключ за Cognee плъгин за памет. Оставете празно за деактивиране. Вземете ключ от https://www.cognee.ai
+
+  cognee_base_url:
+    name: Cognee базов URL
+    description: Заменящ базов URL за самостоятелно хостван Cognee. Оставете празно за Cognee облак (https://api.cognee.ai).

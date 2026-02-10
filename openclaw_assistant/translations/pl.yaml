@@ -58,3 +58,31 @@ configuration:
   gateway_mode:
     name: Tryb Gateway
     description: Tryb działania gateway - local (uruchom gateway lokalnie, zalecane) lub remote (połącz się ze zdalnym gateway)
+
+  enable_memory:
+    name: Włącz pamięć
+    description: Włącz wbudowane hybrydowe wyszukiwanie pamięci SQLite (BM25 + wektor). Zapewnia automatyczne przywracanie pamięci między sesjami.
+
+  memory_session_indexing:
+    name: Indeksowanie sesji
+    description: Indeksuj przeszłe sesje jako przeszukiwalną pamięć. Gdy wyłączone, przeszukiwane są tylko jawne wpisy pamięci.
+
+  mem0_api_key:
+    name: Klucz API Mem0
+    description: Klucz API dla wtyczki pamięci Mem0. Pozostaw pusty aby wyłączyć. Uzyskaj klucz na https://app.mem0.ai
+
+  mem0_base_url:
+    name: Bazowy URL Mem0
+    description: Nadpisz bazowy URL dla samodzielnie hostowanego Mem0. Pozostaw pusty dla chmury Mem0 (https://api.mem0.ai).
+
+  mem0_user_id:
+    name: ID użytkownika Mem0
+    description: Przestrzeń nazw użytkownika dla przechowywania pamięci Mem0 (domyślnie - ha-user)
+
+  cognee_api_key:
+    name: Klucz API Cognee
+    description: Klucz API dla wtyczki pamięci Cognee. Pozostaw pusty aby wyłączyć. Uzyskaj klucz na https://www.cognee.ai
+
+  cognee_base_url:
+    name: Bazowy URL Cognee
+    description: Nadpisz bazowy URL dla samodzielnie hostowanego Cognee. Pozostaw pusty dla chmury Cognee (https://api.cognee.ai).
