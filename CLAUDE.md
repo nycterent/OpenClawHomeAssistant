@@ -55,8 +55,11 @@ This is a **Home Assistant add-on** — the build system is HA's Docker-based ad
 Pure-Python test suite using pytest. Tests cover `oc_config_helper.py` logic, config.yaml/schema/translation consistency, template placeholder coverage, and run.sh env var exports. All tests run locally on macOS — no Docker required.
 
 ```bash
-pip install pytest pyyaml   # one-time setup
-pytest tests/ -v            # run all 62 tests
+pip install -r requirements-test.txt   # one-time setup (pytest + pyyaml)
+pytest tests/ -v                       # run all tests
+pytest tests/test_oc_config_helper.py  # run one test file
+pytest tests/test_oc_config_helper.py::TestApplyMemorySettings -v  # run one test class
+pytest tests/ -k "test_set_creates"    # run tests matching keyword
 ```
 
 ## Versioning
@@ -97,14 +100,17 @@ Called by run.sh to safely modify `openclaw.json` without clobbering user settin
 
 ```bash
 # Apply all gateway settings at once (called during startup)
-python3 /oc_config_helper.py apply-gateway-settings <local|remote> <loopback|lan> <port> <true|false>
+python3 /oc_config_helper.py apply-gateway-settings <local|remote> <loopback|lan> <port> <enable_openai_api:true|false> <allow_insecure:true|false>
+
+# Apply memory settings (built-in, Mem0, Cognee)
+python3 /oc_config_helper.py apply-memory-settings <enable:true|false> <session_indexing:true|false> <mem0_key> <mem0_url> <mem0_user> <cognee_key> <cognee_url>
 
 # Get/set individual gateway keys
 python3 /oc_config_helper.py get <key>
 python3 /oc_config_helper.py set <key> <value>
 ```
 
-Config path is read from `$OPENCLAW_CONFIG_PATH` (default: `/config/.openclaw/openclaw.json`).
+Config path is read from `$OPENCLAW_CONFIG_PATH` (default: `/config/.openclaw/openclaw.json`). Empty string args for `apply-memory-settings` are decoded as `None` (no change).
 
 ## Configuration Flow
 
