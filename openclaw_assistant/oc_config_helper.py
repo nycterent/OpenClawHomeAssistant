@@ -147,6 +147,122 @@ def apply_gateway_settings(mode: str, bind_mode: str, port: int, enable_openai_a
         return True
 
 
+def apply_memory_settings(
+    enable_memory: bool,
+    session_indexing: bool,
+    mem0_api_key: str,
+    mem0_base_url: str,
+    mem0_user_id: str,
+    cognee_api_key: str,
+    cognee_base_url: str,
+) -> bool:
+    """
+    Apply memory-related settings to OpenClaw config.
+
+    Configures built-in SQLite hybrid search, Mem0 plugin, and Cognee plugin.
+    Only writes to file when values actually change.
+    """
+    cfg = read_config()
+    if cfg is None:
+        cfg = {}
+
+    # --- Built-in memory search ---
+    agents = cfg.setdefault("agents", {})
+    defaults = agents.setdefault("defaults", {})
+
+    # Build desired memorySearch block
+    sources = ["memory", "sessions"] if session_indexing else ["memory"]
+    desired_memory = {
+        "enabled": enable_memory,
+        "provider": "auto",
+        "query": {
+            "maxResults": 6,
+            "minScore": 0.35,
+            "hybrid": {"enabled": True, "vectorWeight": 0.7, "textWeight": 0.3},
+        },
+        "cache": {"enabled": True, "maxEntries": 50000},
+        "sync": {"onSessionStart": True, "onSearch": True, "watch": True},
+        "sources": sources,
+        "experimental": {"sessionMemory": session_indexing},
+    }
+    desired_compaction = {
+        "memoryFlush": {"enabled": True, "softThresholdTokens": 40000}
+    }
+
+    current_memory = defaults.get("memorySearch", {})
+    current_compaction = defaults.get("compaction", {})
+
+    changes = []
+
+    if current_memory != desired_memory:
+        defaults["memorySearch"] = desired_memory
+        changes.append("memorySearch")
+
+    if current_compaction != desired_compaction:
+        defaults["compaction"] = desired_compaction
+        changes.append("compaction")
+
+    # --- Mem0 plugin ---
+    plugins = cfg.setdefault("plugins", {})
+    entries = plugins.setdefault("entries", {})
+
+    if mem0_api_key:
+        desired_mem0 = {
+            "enabled": True,
+            "config": {
+                "apiKey": mem0_api_key,
+                "baseUrl": mem0_base_url or "https://api.mem0.ai",
+                "userId": mem0_user_id or "ha-user",
+                "autoRecall": True,
+                "autoCapture": True,
+                "topK": 5,
+            },
+        }
+        if entries.get("openclaw-mem0") != desired_mem0:
+            entries["openclaw-mem0"] = desired_mem0
+            changes.append("plugins.openclaw-mem0")
+    elif "openclaw-mem0" in entries:
+        # API key cleared — disable but preserve entry
+        if entries["openclaw-mem0"].get("enabled") is not False:
+            entries["openclaw-mem0"]["enabled"] = False
+            changes.append("plugins.openclaw-mem0 disabled")
+
+    # --- Cognee plugin ---
+    if cognee_api_key:
+        desired_cognee = {
+            "enabled": True,
+            "config": {
+                "baseUrl": cognee_base_url or "https://api.cognee.ai",
+                "apiKey": cognee_api_key,
+            },
+        }
+        if entries.get("memory-cognee") != desired_cognee:
+            entries["memory-cognee"] = desired_cognee
+            changes.append("plugins.memory-cognee")
+    elif "memory-cognee" in entries:
+        # API key cleared — disable but preserve entry
+        if entries["memory-cognee"].get("enabled") is not False:
+            entries["memory-cognee"]["enabled"] = False
+            changes.append("plugins.memory-cognee disabled")
+
+    # Clean up empty containers to avoid writing unnecessary structure
+    if not entries:
+        del plugins["entries"]
+    if not plugins:
+        del cfg["plugins"]
+
+    if changes:
+        if write_config(cfg):
+            print(f"INFO: Updated memory settings: {', '.join(changes)}")
+            return True
+        else:
+            print("ERROR: Failed to write config")
+            return False
+    else:
+        print("INFO: Memory settings already correct")
+        return True
+
+
 def main():
     """CLI entry point for use by run.sh"""
     if len(sys.argv) < 2:
@@ -167,6 +283,27 @@ def main():
         success = apply_gateway_settings(mode, bind_mode, port, enable_openai_api, allow_insecure_auth)
         sys.exit(0 if success else 1)
     
+    elif cmd == "apply-memory-settings":
+        if len(sys.argv) != 9:
+            print("Usage: oc_config_helper.py apply-memory-settings <enable_memory:true|false> <session_indexing:true|false> <mem0_api_key> <mem0_base_url> <mem0_user_id> <cognee_api_key> <cognee_base_url>")
+            sys.exit(1)
+        # Decode __EMPTY__ sentinel (bash can't reliably pass empty positional args)
+        def _decode(val):
+            return "" if val == "__EMPTY__" else val
+        enable_memory = sys.argv[2].lower() == "true"
+        session_indexing = sys.argv[3].lower() == "true"
+        mem0_api_key = _decode(sys.argv[4])
+        mem0_base_url = _decode(sys.argv[5])
+        mem0_user_id = _decode(sys.argv[6])
+        cognee_api_key = _decode(sys.argv[7])
+        cognee_base_url = _decode(sys.argv[8])
+        success = apply_memory_settings(
+            enable_memory, session_indexing,
+            mem0_api_key, mem0_base_url, mem0_user_id,
+            cognee_api_key, cognee_base_url,
+        )
+        sys.exit(0 if success else 1)
+
     elif cmd == "get":
         if len(sys.argv) != 3:
             print("Usage: oc_config_helper.py get <key>")

@@ -58,3 +58,31 @@ configuration:
   allow_insecure_auth:
     name: Unsichere HTTP-Authentifizierung erlauben
     description: HTTP-Authentifizierung für Gateway-Zugriff im LAN erlauben. WARNUNG - Nur aktivieren, wenn HTTP (nicht HTTPS) für gateway_public_url verwendet wird. Erforderlich für Browser-Zugriff über HTTP.
+
+  enable_memory:
+    name: Gedächtnis aktivieren
+    description: Eingebaute SQLite-Hybrid-Gedächtnissuche aktivieren (BM25 + Vektor). Bietet automatischen Gedächtnisabruf über Sitzungen hinweg.
+
+  memory_session_indexing:
+    name: Sitzungsindexierung
+    description: Vergangene Sitzungen als durchsuchbares Gedächtnis indexieren. Wenn deaktiviert, werden nur explizite Gedächtniseinträge durchsucht.
+
+  mem0_api_key:
+    name: Mem0 API-Schlüssel
+    description: API-Schlüssel für das Mem0-Gedächtnis-Plugin. Leer lassen zum Deaktivieren. Schlüssel erhalten unter https://app.mem0.ai
+
+  mem0_base_url:
+    name: Mem0 Basis-URL
+    description: Basis-URL für selbst gehostetes Mem0 überschreiben. Leer lassen für Mem0-Cloud (https://api.mem0.ai).
+
+  mem0_user_id:
+    name: Mem0 Benutzer-ID
+    description: Benutzer-Namespace für Mem0-Gedächtnisspeicher (Standard - ha-user)
+
+  cognee_api_key:
+    name: Cognee API-Schlüssel
+    description: API-Schlüssel für das Cognee-Gedächtnis-Plugin. Leer lassen zum Deaktivieren. Schlüssel erhalten unter https://www.cognee.ai
+
+  cognee_base_url:
+    name: Cognee Basis-URL
+    description: Basis-URL für selbst gehostetes Cognee überschreiben. Leer lassen für Cognee-Cloud (https://api.cognee.ai).

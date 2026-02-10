@@ -286,3 +286,180 @@ class TestMainCLI:
         with __import__("pytest").raises(SystemExit) as exc_info:
             oc_helper.main()
         assert exc_info.value.code == 1
+
+
+# ---------------------------------------------------------------------------
+# apply_memory_settings
+# ---------------------------------------------------------------------------
+
+
+class TestApplyMemorySettings:
+    def test_creates_full_memory_structure_from_empty(self, oc_helper, tmp_config):
+        write_fixture_config(tmp_config, {})
+        assert oc_helper.apply_memory_settings(True, True, "", "", "", "", "") is True
+        cfg = json.loads(tmp_config.read_text(encoding="utf-8"))
+        ms = cfg["agents"]["defaults"]["memorySearch"]
+        assert ms["enabled"] is True
+        assert ms["provider"] == "auto"
+        assert ms["query"]["hybrid"]["enabled"] is True
+        assert ms["sources"] == ["memory", "sessions"]
+        assert ms["experimental"]["sessionMemory"] is True
+        comp = cfg["agents"]["defaults"]["compaction"]
+        assert comp["memoryFlush"]["enabled"] is True
+        assert comp["memoryFlush"]["softThresholdTokens"] == 40000
+
+    def test_session_indexing_false_excludes_sessions(self, oc_helper, tmp_config):
+        write_fixture_config(tmp_config, {})
+        oc_helper.apply_memory_settings(True, False, "", "", "", "", "")
+        cfg = json.loads(tmp_config.read_text(encoding="utf-8"))
+        ms = cfg["agents"]["defaults"]["memorySearch"]
+        assert ms["sources"] == ["memory"]
+        assert ms["experimental"]["sessionMemory"] is False
+
+    def test_enable_memory_false_sets_disabled(self, oc_helper, tmp_config):
+        write_fixture_config(tmp_config, {})
+        oc_helper.apply_memory_settings(False, True, "", "", "", "", "")
+        cfg = json.loads(tmp_config.read_text(encoding="utf-8"))
+        assert cfg["agents"]["defaults"]["memorySearch"]["enabled"] is False
+
+    def test_preserves_existing_gateway_config(self, oc_helper, tmp_config):
+        write_fixture_config(tmp_config, {
+            "gateway": {"mode": "local", "port": 18789, "auth": {"token": "secret"}}
+        })
+        oc_helper.apply_memory_settings(True, True, "", "", "", "", "")
+        cfg = json.loads(tmp_config.read_text(encoding="utf-8"))
+        assert cfg["gateway"]["mode"] == "local"
+        assert cfg["gateway"]["auth"]["token"] == "secret"
+
+    def test_preserves_existing_agent_defaults(self, oc_helper, tmp_config):
+        write_fixture_config(tmp_config, {
+            "agents": {"defaults": {"workspace": "/config/clawd", "customKey": 42}}
+        })
+        oc_helper.apply_memory_settings(True, True, "", "", "", "", "")
+        cfg = json.loads(tmp_config.read_text(encoding="utf-8"))
+        assert cfg["agents"]["defaults"]["workspace"] == "/config/clawd"
+        assert cfg["agents"]["defaults"]["customKey"] == 42
+        assert "memorySearch" in cfg["agents"]["defaults"]
+
+    def test_idempotent_no_rewrite(self, oc_helper, tmp_config):
+        write_fixture_config(tmp_config, {})
+        oc_helper.apply_memory_settings(True, True, "", "", "", "", "")
+        mtime_first = tmp_config.stat().st_mtime_ns
+        oc_helper.apply_memory_settings(True, True, "", "", "", "", "")
+        mtime_second = tmp_config.stat().st_mtime_ns
+        assert mtime_first == mtime_second
+
+    def test_creates_config_from_missing_file(self, oc_helper, tmp_config):
+        assert not tmp_config.exists()
+        assert oc_helper.apply_memory_settings(True, True, "", "", "", "", "") is True
+        cfg = json.loads(tmp_config.read_text(encoding="utf-8"))
+        assert cfg["agents"]["defaults"]["memorySearch"]["enabled"] is True
+
+    def test_mem0_config_written_when_key_set(self, oc_helper, tmp_config):
+        write_fixture_config(tmp_config, {})
+        oc_helper.apply_memory_settings(True, True, "m0-key-123", "", "ha-user", "", "")
+        cfg = json.loads(tmp_config.read_text(encoding="utf-8"))
+        mem0 = cfg["plugins"]["entries"]["openclaw-mem0"]
+        assert mem0["enabled"] is True
+        assert mem0["config"]["apiKey"] == "m0-key-123"
+        assert mem0["config"]["baseUrl"] == "https://api.mem0.ai"
+        assert mem0["config"]["userId"] == "ha-user"
+        assert mem0["config"]["autoRecall"] is True
+        assert mem0["config"]["topK"] == 5
+
+    def test_mem0_custom_base_url(self, oc_helper, tmp_config):
+        write_fixture_config(tmp_config, {})
+        oc_helper.apply_memory_settings(True, True, "key", "https://my-mem0.local", "admin", "", "")
+        cfg = json.loads(tmp_config.read_text(encoding="utf-8"))
+        assert cfg["plugins"]["entries"]["openclaw-mem0"]["config"]["baseUrl"] == "https://my-mem0.local"
+        assert cfg["plugins"]["entries"]["openclaw-mem0"]["config"]["userId"] == "admin"
+
+    def test_mem0_disabled_when_key_empty_existing_entry(self, oc_helper, tmp_config):
+        write_fixture_config(tmp_config, {
+            "plugins": {"entries": {"openclaw-mem0": {"enabled": True, "config": {"apiKey": "old"}}}}
+        })
+        oc_helper.apply_memory_settings(True, True, "", "", "", "", "")
+        cfg = json.loads(tmp_config.read_text(encoding="utf-8"))
+        assert cfg["plugins"]["entries"]["openclaw-mem0"]["enabled"] is False
+
+    def test_mem0_not_created_when_key_empty_no_prior(self, oc_helper, tmp_config):
+        write_fixture_config(tmp_config, {})
+        oc_helper.apply_memory_settings(True, True, "", "", "", "", "")
+        cfg = json.loads(tmp_config.read_text(encoding="utf-8"))
+        assert "plugins" not in cfg
+
+    def test_cognee_config_written_when_key_set(self, oc_helper, tmp_config):
+        write_fixture_config(tmp_config, {})
+        oc_helper.apply_memory_settings(True, True, "", "", "", "cog-key-456", "")
+        cfg = json.loads(tmp_config.read_text(encoding="utf-8"))
+        cognee = cfg["plugins"]["entries"]["memory-cognee"]
+        assert cognee["enabled"] is True
+        assert cognee["config"]["apiKey"] == "cog-key-456"
+        assert cognee["config"]["baseUrl"] == "https://api.cognee.ai"
+
+    def test_cognee_custom_base_url(self, oc_helper, tmp_config):
+        write_fixture_config(tmp_config, {})
+        oc_helper.apply_memory_settings(True, True, "", "", "", "key", "https://my-cognee.local")
+        cfg = json.loads(tmp_config.read_text(encoding="utf-8"))
+        assert cfg["plugins"]["entries"]["memory-cognee"]["config"]["baseUrl"] == "https://my-cognee.local"
+
+    def test_cognee_disabled_when_key_empty_existing_entry(self, oc_helper, tmp_config):
+        write_fixture_config(tmp_config, {
+            "plugins": {"entries": {"memory-cognee": {"enabled": True, "config": {"apiKey": "old"}}}}
+        })
+        oc_helper.apply_memory_settings(True, True, "", "", "", "", "")
+        cfg = json.loads(tmp_config.read_text(encoding="utf-8"))
+        assert cfg["plugins"]["entries"]["memory-cognee"]["enabled"] is False
+
+    def test_preserves_other_plugins(self, oc_helper, tmp_config):
+        write_fixture_config(tmp_config, {
+            "plugins": {"entries": {"some-other-plugin": {"enabled": True, "config": {"foo": "bar"}}}}
+        })
+        oc_helper.apply_memory_settings(True, True, "m0-key", "", "", "", "")
+        cfg = json.loads(tmp_config.read_text(encoding="utf-8"))
+        assert cfg["plugins"]["entries"]["some-other-plugin"]["config"]["foo"] == "bar"
+        assert cfg["plugins"]["entries"]["openclaw-mem0"]["enabled"] is True
+
+
+# ---------------------------------------------------------------------------
+# apply_memory_settings CLI
+# ---------------------------------------------------------------------------
+
+
+class TestApplyMemorySettingsCLI:
+    def test_basic_cli(self, oc_helper, tmp_config, monkeypatch):
+        write_fixture_config(tmp_config, {})
+        monkeypatch.setattr(
+            "sys.argv",
+            ["oc_config_helper.py", "apply-memory-settings",
+             "true", "true", "__EMPTY__", "__EMPTY__", "__EMPTY__", "__EMPTY__", "__EMPTY__"],
+        )
+        with __import__("pytest").raises(SystemExit) as exc_info:
+            oc_helper.main()
+        assert exc_info.value.code == 0
+        cfg = json.loads(tmp_config.read_text(encoding="utf-8"))
+        assert cfg["agents"]["defaults"]["memorySearch"]["enabled"] is True
+
+    def test_cli_with_mem0_and_cognee(self, oc_helper, tmp_config, monkeypatch):
+        write_fixture_config(tmp_config, {})
+        monkeypatch.setattr(
+            "sys.argv",
+            ["oc_config_helper.py", "apply-memory-settings",
+             "true", "true", "m0key", "__EMPTY__", "myuser", "cogkey", "__EMPTY__"],
+        )
+        with __import__("pytest").raises(SystemExit) as exc_info:
+            oc_helper.main()
+        assert exc_info.value.code == 0
+        cfg = json.loads(tmp_config.read_text(encoding="utf-8"))
+        assert cfg["plugins"]["entries"]["openclaw-mem0"]["config"]["apiKey"] == "m0key"
+        assert cfg["plugins"]["entries"]["openclaw-mem0"]["config"]["userId"] == "myuser"
+        assert cfg["plugins"]["entries"]["memory-cognee"]["config"]["apiKey"] == "cogkey"
+
+    def test_wrong_arg_count_exits_1(self, oc_helper, tmp_config, monkeypatch):
+        monkeypatch.setattr(
+            "sys.argv",
+            ["oc_config_helper.py", "apply-memory-settings", "true"],
+        )
+        with __import__("pytest").raises(SystemExit) as exc_info:
+            oc_helper.main()
+        assert exc_info.value.code == 1
