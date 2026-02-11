@@ -300,7 +300,7 @@ class TestApplyMemorySettings:
         cfg = json.loads(tmp_config.read_text(encoding="utf-8"))
         ms = cfg["agents"]["defaults"]["memorySearch"]
         assert ms["enabled"] is True
-        assert ms["provider"] == "auto"
+        assert "provider" not in ms  # provider is user-owned, not set by add-on
         assert ms["query"]["hybrid"]["enabled"] is True
         assert ms["sources"] == ["memory", "sessions"]
         assert ms["experimental"]["sessionMemory"] is True
@@ -340,6 +340,24 @@ class TestApplyMemorySettings:
         assert cfg["agents"]["defaults"]["workspace"] == "/config/clawd"
         assert cfg["agents"]["defaults"]["customKey"] == 42
         assert "memorySearch" in cfg["agents"]["defaults"]
+
+    def test_preserves_existing_provider(self, oc_helper, tmp_config):
+        """Provider is user-owned; add-on must not overwrite it."""
+        write_fixture_config(tmp_config, {
+            "agents": {"defaults": {"memorySearch": {
+                "enabled": True, "provider": "openai",
+                "model": "text-embedding-3-small",
+                "remote": {"apiKey": "sk-test"},
+                "fallback": "none",
+            }}}
+        })
+        oc_helper.apply_memory_settings(True, True, "", "", "", "", "")
+        cfg = json.loads(tmp_config.read_text(encoding="utf-8"))
+        ms = cfg["agents"]["defaults"]["memorySearch"]
+        assert ms["provider"] == "openai"
+        assert ms["model"] == "text-embedding-3-small"
+        assert ms["remote"] == {"apiKey": "sk-test"}
+        assert ms["fallback"] == "none"
 
     def test_idempotent_no_rewrite(self, oc_helper, tmp_config):
         write_fixture_config(tmp_config, {})

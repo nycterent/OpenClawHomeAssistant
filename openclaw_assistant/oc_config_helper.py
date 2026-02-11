@@ -170,11 +170,10 @@ def apply_memory_settings(
     agents = cfg.setdefault("agents", {})
     defaults = agents.setdefault("defaults", {})
 
-    # Build desired memorySearch block
+    # Build desired memorySearch block (add-on-managed keys only)
     sources = ["memory", "sessions"] if session_indexing else ["memory"]
     desired_memory = {
         "enabled": enable_memory,
-        "provider": "auto",
         "query": {
             "maxResults": 6,
             "minScore": 0.35,
@@ -185,11 +184,16 @@ def apply_memory_settings(
         "sources": sources,
         "experimental": {"sessionMemory": session_indexing},
     }
+
+    # Preserve user/OpenClaw-owned keys the add-on should not manage
+    current_memory = defaults.get("memorySearch", {})
+    for key in ("provider", "model", "remote", "fallback"):
+        if key in current_memory:
+            desired_memory[key] = current_memory[key]
     desired_compaction = {
         "memoryFlush": {"enabled": True, "softThresholdTokens": 40000}
     }
 
-    current_memory = defaults.get("memorySearch", {})
     current_compaction = defaults.get("compaction", {})
 
     changes = []
