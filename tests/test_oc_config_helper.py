@@ -380,16 +380,15 @@ class TestApplyMemorySettings:
         mem0 = cfg["plugins"]["entries"]["openclaw-mem0"]
         assert mem0["enabled"] is True
         assert mem0["config"]["apiKey"] == "m0-key-123"
-        assert mem0["config"]["baseUrl"] == "https://api.mem0.ai"
+        assert mem0["config"]["mode"] == "platform"
         assert mem0["config"]["userId"] == "ha-user"
         assert mem0["config"]["autoRecall"] is True
         assert mem0["config"]["topK"] == 5
 
-    def test_mem0_custom_base_url(self, oc_helper, tmp_config):
+    def test_mem0_custom_user_id(self, oc_helper, tmp_config):
         write_fixture_config(tmp_config, {})
-        oc_helper.apply_memory_settings(True, True, "key", "https://my-mem0.local", "admin", "", "")
+        oc_helper.apply_memory_settings(True, True, "key", "", "admin", "", "")
         cfg = json.loads(tmp_config.read_text(encoding="utf-8"))
-        assert cfg["plugins"]["entries"]["openclaw-mem0"]["config"]["baseUrl"] == "https://my-mem0.local"
         assert cfg["plugins"]["entries"]["openclaw-mem0"]["config"]["userId"] == "admin"
 
     def test_mem0_disabled_when_key_empty_existing_entry(self, oc_helper, tmp_config):

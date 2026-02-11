@@ -214,8 +214,8 @@ def apply_memory_settings(
         desired_mem0 = {
             "enabled": True,
             "config": {
+                "mode": "platform",
                 "apiKey": mem0_api_key,
-                "baseUrl": mem0_base_url or "https://api.mem0.ai",
                 "userId": mem0_user_id or "ha-user",
                 "autoRecall": True,
                 "autoCapture": True,
