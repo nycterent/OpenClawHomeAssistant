@@ -47,7 +47,8 @@ SIGNAL_CLI_PATH=$(get_config '.channels.signal.cliPath')
 SIGNAL_HTTP_URL=$(get_config '.channels.signal.httpUrl')
 
 # Ensure a single directory is symlinked to persistent storage.
-# If a real directory with data exists, migrate it first.
+# Only migrates data if the persistent store is empty (avoids overwriting
+# a valid registration with stale/empty data from a secondary path).
 _ensure_symlink() {
   local target_dir="$1"
   mkdir -p "$(dirname "$target_dir")"
@@ -60,10 +61,13 @@ _ensure_symlink() {
       echo "INFO: Updated signal-cli symlink at $target_dir"
     fi
   elif [ -d "$target_dir" ]; then
-    # Real directory — migrate contents then replace with symlink
-    if [ "$(ls -A "$target_dir" 2>/dev/null)" ]; then
+    # Real directory — migrate only if persistent store has no account data
+    if [ "$(ls -A "$target_dir" 2>/dev/null)" ] && \
+       [ ! -d "$SIGNAL_DATA_DIR/data" ] || [ -z "$(ls -A "$SIGNAL_DATA_DIR/data" 2>/dev/null)" ]; then
       echo "INFO: Migrating signal-cli data from $target_dir to persistent storage..."
       cp -a "$target_dir"/* "$SIGNAL_DATA_DIR"/ 2>/dev/null || true
+    else
+      echo "INFO: Persistent storage already has data, skipping migration from $target_dir"
     fi
     rm -rf "$target_dir"
     ln -s "$SIGNAL_DATA_DIR" "$target_dir"
