@@ -428,6 +428,12 @@ fi
 # indefinitely on low-power devices (e.g. aarch64 with native builds).
 # If install fails/times out, remove the broken plugin entry from config so
 # the gateway doesn't error on "plugin not found" at every startup.
+#
+# Skip peer dependency installation — plugins like mem0ai declare heavy peer
+# deps (sqlite3, pg, neo4j-driver, @azure/*, @langchain/*) that require native
+# compilation.  The plugin only needs its direct deps for API-based usage.
+export npm_config_legacy_peer_deps=true
+
 install_plugin() {
   local plugin_name="$1"   # e.g. @mem0/openclaw-mem0
   local entry_key="$2"     # e.g. openclaw-mem0  (key in plugins.entries)
@@ -437,6 +443,12 @@ install_plugin() {
   if [ -d "$ext_dir/node_modules" ]; then
     echo "INFO: Plugin $plugin_name already installed"
     return 0
+  fi
+
+  # Remove partial installs (no node_modules) so "plugin already exists" doesn't block
+  if [ -d "$ext_dir" ]; then
+    echo "INFO: Cleaning up partial install of $plugin_name"
+    rm -rf "$ext_dir"
   fi
 
   echo "INFO: Installing plugin $plugin_name (timeout 90s)..."
