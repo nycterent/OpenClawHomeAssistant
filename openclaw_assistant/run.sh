@@ -281,6 +281,28 @@ fi
 
 # Start ingress reverse proxy (nginx). This provides the add-on UI inside HA.
 # Token is injected server-side; never put it in the browser URL.
+NGINX_PID_FILE="/var/run/openclaw-nginx.pid"
+
+# Clean up stale nginx process from previous run (e.g., after crash/unclean restart)
+if [ -f "$NGINX_PID_FILE" ]; then
+  OLD_NGINX_PID=$(cat "$NGINX_PID_FILE" 2>/dev/null || echo "")
+  if [ -n "$OLD_NGINX_PID" ] && kill -0 "$OLD_NGINX_PID" 2>/dev/null; then
+    echo "Stopping previous nginx process (PID $OLD_NGINX_PID)..."
+    kill "$OLD_NGINX_PID" 2>/dev/null || true
+    sleep 1
+    kill -9 "$OLD_NGINX_PID" 2>/dev/null || true
+  fi
+  rm -f "$NGINX_PID_FILE"
+fi
+# Also kill any orphaned nginx workers that might hold port 8099
+if command -v pkill >/dev/null 2>&1; then
+  pkill -f "nginx.*-c /etc/nginx/nginx.conf" 2>/dev/null || true
+  sleep 1
+fi
+# Verify port 8099 is actually free before proceeding
+if command -v ss >/dev/null 2>&1 && ss -tlnp 2>/dev/null | grep -q ':8099 '; then
+  echo "WARN: Port 8099 still in use after cleanup; nginx may fail to start"
+fi
 
 # Render nginx config from template.
 # The gateway token is NOT managed by the add-on; OpenClaw will generate/store it.
@@ -324,6 +346,13 @@ PY
 echo "Starting ingress proxy (nginx) on :8099 ..."
 nginx -g 'daemon off;' &
 NGINX_PID=$!
+sleep 1
+if kill -0 "$NGINX_PID" 2>/dev/null; then
+  echo "$NGINX_PID" > "$NGINX_PID_FILE"
+  echo "nginx started with PID $NGINX_PID"
+else
+  echo "WARN: nginx failed to start (PID $NGINX_PID exited); ingress UI may be unavailable"
+fi
 
 # Wait for gateway; if it exits, shut down others.
 wait "${GW_PID}"

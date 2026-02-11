@@ -261,7 +261,7 @@ Copy the token — you'll need it as the API key.
 3. Configure:
    - **API Key**: Paste your gateway token
    - **Base URL**: `http://127.0.0.1:18789/v1` or a LAN url if you use `gateway_bind_mode: lan`
-   - **Api Version**: leave empty
+   - **API Version**: leave empty
    - **Organization**: leave empty
    - **Skip Authentication**: **true**
 
