@@ -426,11 +426,39 @@ fi
 # Install memory plugins if configured (idempotent, cached in /config).
 # Timeout after 90s to prevent npm dependency installs from blocking startup
 # indefinitely on low-power devices (e.g. aarch64 with native builds).
+# If install fails/times out, remove the broken plugin entry from config so
+# the gateway doesn't error on "plugin not found" at every startup.
+install_plugin() {
+  local plugin_name="$1"   # e.g. @mem0/openclaw-mem0
+  local entry_key="$2"     # e.g. openclaw-mem0  (key in plugins.entries)
+  local ext_dir="${OPENCLAW_STATE_DIR}/extensions/${entry_key}"
+
+  # Skip if already fully installed (has node_modules)
+  if [ -d "$ext_dir/node_modules" ]; then
+    echo "INFO: Plugin $plugin_name already installed"
+    return 0
+  fi
+
+  echo "INFO: Installing plugin $plugin_name (timeout 90s)..."
+  if ! timeout 90 openclaw plugins install "$plugin_name" 2>&1; then
+    echo "WARN: Plugin $plugin_name install failed (timed out or errored)"
+    echo "WARN: Removing broken plugin entry from config to prevent gateway errors"
+    # Remove the plugin entry so gateway doesn't fail validation
+    if [ -f "$OPENCLAW_CONFIG_PATH" ]; then
+      jq "del(.plugins.entries.\"${entry_key}\")" "$OPENCLAW_CONFIG_PATH" > "${OPENCLAW_CONFIG_PATH}.tmp" && \
+        mv "${OPENCLAW_CONFIG_PATH}.tmp" "$OPENCLAW_CONFIG_PATH" || true
+    fi
+    # Clean up partial install
+    rm -rf "$ext_dir" 2>/dev/null || true
+    return 1
+  fi
+}
+
 if [ -n "$MEM0_API_KEY" ]; then
-  timeout 90 openclaw plugins install @mem0/openclaw-mem0 2>&1 || echo "WARN: Mem0 plugin install failed (timed out or errored)"
+  install_plugin "@mem0/openclaw-mem0" "openclaw-mem0" || true
 fi
 if [ -n "$COGNEE_API_KEY" ]; then
-  timeout 90 openclaw plugins install @cognee/cognee-openclaw 2>&1 || echo "WARN: Cognee plugin install failed (timed out or errored)"
+  install_plugin "@cognee/cognee-openclaw" "cognee-openclaw" || true
 fi
 
 # Run custom startup scripts (before gateway so services are ready)
