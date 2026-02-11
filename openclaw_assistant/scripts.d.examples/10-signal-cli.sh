@@ -19,8 +19,19 @@
 set -euo pipefail
 
 SIGNAL_DATA_DIR="/config/.openclaw/signal-cli-data"
-SIGNAL_SYSTEM_DIR="/root/.local/share/signal-cli"
 SIGNAL_PID_FILE="/var/run/signal-cli.pid"
+
+# signal-cli resolves its data directory using XDG_DATA_HOME (if set), then
+# $HOME/.local/share as fallback.  run.sh exports HOME=/config and
+# XDG_DATA_HOME=/config/.local/share, so signal-cli looks at
+# /config/.local/share/signal-cli — NOT /root/.local/share/signal-cli.
+# We derive the path the same way to guarantee the symlink lands where
+# signal-cli actually reads.
+SIGNAL_SYSTEM_DIR="${XDG_DATA_HOME:-${HOME:-/root}/.local/share}/signal-cli"
+
+# Also keep the legacy /root path symlinked so manual `docker exec` sessions
+# (which inherit HOME=/root and no XDG_DATA_HOME) still find the data.
+SIGNAL_LEGACY_DIR="/root/.local/share/signal-cli"
 
 CONFIG_FILE="/config/.openclaw/openclaw.json"
 
@@ -35,32 +46,44 @@ SIGNAL_ACCOUNT=$(get_config '.channels.signal.account')
 SIGNAL_CLI_PATH=$(get_config '.channels.signal.cliPath')
 SIGNAL_HTTP_URL=$(get_config '.channels.signal.httpUrl')
 
+# Ensure a single directory is symlinked to persistent storage.
+# If a real directory with data exists, migrate it first.
+_ensure_symlink() {
+  local target_dir="$1"
+  mkdir -p "$(dirname "$target_dir")"
+
+  if [ -L "$target_dir" ]; then
+    # Already a symlink — verify destination
+    if [ "$(readlink "$target_dir")" != "$SIGNAL_DATA_DIR" ]; then
+      rm -f "$target_dir"
+      ln -s "$SIGNAL_DATA_DIR" "$target_dir"
+      echo "INFO: Updated signal-cli symlink at $target_dir"
+    fi
+  elif [ -d "$target_dir" ]; then
+    # Real directory — migrate contents then replace with symlink
+    if [ "$(ls -A "$target_dir" 2>/dev/null)" ]; then
+      echo "INFO: Migrating signal-cli data from $target_dir to persistent storage..."
+      cp -a "$target_dir"/* "$SIGNAL_DATA_DIR"/ 2>/dev/null || true
+    fi
+    rm -rf "$target_dir"
+    ln -s "$SIGNAL_DATA_DIR" "$target_dir"
+    echo "INFO: Linked $target_dir to persistent storage"
+  else
+    ln -s "$SIGNAL_DATA_DIR" "$target_dir"
+    echo "INFO: Created signal-cli symlink at $target_dir"
+  fi
+}
+
 setup_persistence() {
   # Create persistent data directory
   mkdir -p "$SIGNAL_DATA_DIR"
-  mkdir -p "$(dirname "$SIGNAL_SYSTEM_DIR")"
 
-  # Link ephemeral system directory to persistent location
-  if [ -L "$SIGNAL_SYSTEM_DIR" ]; then
-    # Already a symlink - verify it points to correct location
-    if [ "$(readlink "$SIGNAL_SYSTEM_DIR")" != "$SIGNAL_DATA_DIR" ]; then
-      rm -f "$SIGNAL_SYSTEM_DIR"
-      ln -s "$SIGNAL_DATA_DIR" "$SIGNAL_SYSTEM_DIR"
-      echo "INFO: Updated signal-cli symlink to persistent storage"
-    fi
-  elif [ -d "$SIGNAL_SYSTEM_DIR" ]; then
-    # Existing directory with data - migrate then symlink
-    if [ "$(ls -A "$SIGNAL_SYSTEM_DIR" 2>/dev/null)" ]; then
-      echo "INFO: Migrating existing signal-cli data to persistent storage..."
-      cp -a "$SIGNAL_SYSTEM_DIR"/* "$SIGNAL_DATA_DIR"/ 2>/dev/null || true
-    fi
-    rm -rf "$SIGNAL_SYSTEM_DIR"
-    ln -s "$SIGNAL_DATA_DIR" "$SIGNAL_SYSTEM_DIR"
-    echo "INFO: Linked signal-cli data to persistent storage"
-  else
-    # No directory exists - create symlink
-    ln -s "$SIGNAL_DATA_DIR" "$SIGNAL_SYSTEM_DIR"
-    echo "INFO: Created signal-cli symlink to persistent storage"
+  # Primary symlink — where signal-cli actually looks (XDG-aware)
+  _ensure_symlink "$SIGNAL_SYSTEM_DIR"
+
+  # Legacy symlink — for manual docker exec sessions (HOME=/root, no XDG)
+  if [ "$SIGNAL_LEGACY_DIR" != "$SIGNAL_SYSTEM_DIR" ]; then
+    _ensure_symlink "$SIGNAL_LEGACY_DIR"
   fi
 }
 
