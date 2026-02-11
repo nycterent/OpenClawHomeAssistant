@@ -105,13 +105,15 @@ start_daemon() {
   fi
 
   echo "Starting signal-cli daemon for $SIGNAL_ACCOUNT on 127.0.0.1:$port..."
+  # Force IPv4 to avoid Java binding to IPv6-mapped localhost
+  export SIGNAL_CLI_OPTS="${SIGNAL_CLI_OPTS:-} -Djava.net.preferIPv4Stack=true"
   "$SIGNAL_CLI_PATH" -a "$SIGNAL_ACCOUNT" daemon --http "127.0.0.1:$port" &
   local pid=$!
   echo "$pid" > "$SIGNAL_PID_FILE"
   echo "INFO: signal-cli daemon started with PID $pid"
 
-  # Give it a moment to start and check if it's still running
-  sleep 2
+  # Give it a longer moment to start (Java JVM startup is slow)
+  sleep 4
   if ! kill -0 "$pid" 2>/dev/null; then
     echo "ERROR: signal-cli daemon failed to start or exited immediately"
     rm -f "$SIGNAL_PID_FILE"
