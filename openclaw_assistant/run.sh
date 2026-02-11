@@ -423,12 +423,14 @@ if [ -f "$HELPER_PATH" ]; then
     echo "WARN: Failed to apply memory settings; continuing with existing config"
 fi
 
-# Install memory plugins if configured (idempotent, cached in /config)
+# Install memory plugins if configured (idempotent, cached in /config).
+# Timeout after 90s to prevent npm dependency installs from blocking startup
+# indefinitely on low-power devices (e.g. aarch64 with native builds).
 if [ -n "$MEM0_API_KEY" ]; then
-  openclaw plugins install @mem0/openclaw-mem0 2>&1 || echo "WARN: Mem0 plugin install failed"
+  timeout 90 openclaw plugins install @mem0/openclaw-mem0 2>&1 || echo "WARN: Mem0 plugin install failed (timed out or errored)"
 fi
 if [ -n "$COGNEE_API_KEY" ]; then
-  openclaw plugins install @cognee/cognee-openclaw 2>&1 || echo "WARN: Cognee plugin install failed"
+  timeout 90 openclaw plugins install @cognee/cognee-openclaw 2>&1 || echo "WARN: Cognee plugin install failed (timed out or errored)"
 fi
 
 # Run custom startup scripts (before gateway so services are ready)
