@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Home Assistant add-on that runs **OpenClaw** (an AI assistant gateway) inside Home Assistant OS. Provides an always-on gateway, an embedded web terminal (ttyd), and an Ingress landing page with links to the Gateway Web UI.
 
-Current version: **0.5.41** with OpenClaw **2026.2.9**.
+Current version: **0.5.42** with OpenClaw **2026.2.9**.
 
 This is a **fork** of [techartdev/OpenClawHomeAssistant](https://github.com/techartdev/OpenClawHomeAssistant). The fork adds custom features (scripts.d hooks, Java 21 fix, Signal/Matrix deps). When syncing with upstream, merge or rebase against `techartdev/main` — the fork may be several versions ahead with local customizations.
 
