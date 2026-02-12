@@ -1,5 +1,5 @@
 name: OpenClaw Assistant
-version: "0.5.41"
+version: "0.5.42"
 slug: openclaw_assistant
 description: Run OpenClaw Assistant (OpenClaw-compatible) as a Home Assistant add-on.
 url: https://github.com/techartdev/OpenClawHomeAssistant
@@ -16,7 +16,7 @@ host_network: true
 
 # Home Assistant Ingress (UI inside the add-on page)
 ingress: true
-ingress_port: 8099
+ingress_port: 48099
 panel_title: OpenClaw Assistant
 panel_icon: mdi:robot
 

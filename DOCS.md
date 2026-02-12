@@ -29,7 +29,7 @@ The add-on container runs three services:
 | Service | Port | Purpose |
 |---|---|---|
 | **OpenClaw Gateway** | 18789 (configurable) | The AI agent server — handles skills, chat, automations |
-| **nginx** (Ingress proxy) | 8099 (fixed) | Serves the landing page inside Home Assistant |
+| **nginx** (Ingress proxy) | 48099 (fixed) | Serves the landing page inside Home Assistant |
 | **ttyd** (Web terminal) | 7681 (configurable) | Provides a browser-based terminal for setup and management |
 
 When you open the add-on page in Home Assistant, nginx serves a landing page with:
@@ -46,6 +46,7 @@ When you open the add-on page in Home Assistant, nginx serves a landing page wit
 | `/config/.node_global/` | Yes | User-installed npm packages (skills installed via dashboard) |
 | `/config/secrets/` | Yes | Tokens (e.g., `homeassistant.token`) |
 | `/config/keys/` | Yes | SSH keys (e.g., router SSH key) |
+| `/config/.linuxbrew/` | Yes | Homebrew install and brew-installed CLI tools |
 | `/usr/lib/node_modules/openclaw/` | No | OpenClaw installation (rebuilt with each image update) |
 
 > **Important**: Everything under `/config/` persists across add-on updates. The container filesystem (`/usr/`, `/opt/`, etc.) is rebuilt each time the image changes.
@@ -381,7 +382,7 @@ The connection details are also saved to `/config/CONNECTION_NOTES.txt` for refe
 | User-installed npm skills | `/config/.node_global/` | Yes |
 | SSH keys | `/config/keys/` | Yes |
 | Tokens | `/config/secrets/` | Yes |
-| Homebrew-installed tools | `/home/linuxbrew/` | **No** — container filesystem |
+| Homebrew & brew-installed tools | `/config/.linuxbrew/` | Yes (synced on startup) |
 | OpenClaw binary | `/usr/lib/node_modules/openclaw/` | **No** — reinstalled from image |
 
 ### How built-in skills work
@@ -402,7 +403,13 @@ The add-on also configures `pnpm` global directory to persistent storage at `/co
 
 ### Homebrew-installed tools
 
-Some skills depend on CLI tools installed via Homebrew (e.g., `gemini`, `aider`). These are installed into `/home/linuxbrew/` which is **not persistent** — they are lost on image rebuild. Skills will typically reinstall their dependencies automatically when needed.
+Homebrew (Linuxbrew) and all brew-installed CLI tools (e.g., `gemini`, `aider`, `gh`, `bw`) are now **persisted** across add-on updates. On each startup, the add-on:
+
+1. Syncs the image's Homebrew install to `/config/.linuxbrew/`
+2. Creates a symlink from `/home/linuxbrew/.linuxbrew/` to the persistent copy
+3. On subsequent boots, only newer files are synced (user-installed packages are preserved)
+
+This means `brew install` packages survive image rebuilds.
 
 ---
 
@@ -443,7 +450,7 @@ Home Assistant checks for add-on updates automatically. When an update is availa
 **What happens during an update**:
 - The container is destroyed and recreated from the new image
 - Everything under `/config/` is preserved (config, skills, workspace, keys)
-- Homebrew packages are lost (reinstalled by skills on demand)
+- Homebrew and brew-installed packages are preserved (synced to `/config/.linuxbrew/`)
 - The OpenClaw binary is updated to the version in the new image
 
 ### Checking your version
@@ -490,9 +497,9 @@ Then restart the add-on. It will re-bootstrap a fresh configuration.
 
 Go to **Settings → Add-ons → OpenClaw Assistant → Log** tab. Logs show startup messages, errors, and service status.
 
-### Port 8099 conflict (add-on page won't load)
+### Port 48099 conflict (add-on page won't load)
 
-**Symptom**: `bind() to 0.0.0.0:8099 failed (98: Address already in use)` in logs.
+**Symptom**: `bind() to 0.0.0.0:48099 failed (98: Address already in use)` in logs.
 
 **Cause**: A stale nginx process from a previous run is still holding the port. This can happen after a crash or unclean restart.
 
